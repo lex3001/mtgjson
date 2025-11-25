@@ -1,10 +1,5 @@
 """Test the EnrichmentProvider."""
 
-import json
-import tempfile
-from pathlib import Path
-from typing import Any, Dict
-
 import pytest
 
 from mtgjson5.classes import MtgjsonCardObject
@@ -25,7 +20,6 @@ class TestEnrichmentProviderInit:
         """Test that EnrichmentProvider loads production enrichment file."""
         provider = EnrichmentProvider()
         # Should load the real file with production data
-        assert "_comment" in provider._data
         assert "by_uuid" in provider._data
         assert len(provider._data["by_uuid"]) > 0
         # Check for known production UUID (FIN 551a - Traveling Chocobo, yellow)

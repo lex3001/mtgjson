@@ -3,12 +3,15 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
+from singleton_decorator import singleton
+
 from ..classes import MtgjsonCardObject
 from ..constants import RESOURCE_PATH
 
 LOGGER = logging.getLogger(__name__)
 
 
+@singleton
 class EnrichmentProvider:
     """
     Loads mtgjson5/resources/card_enrichment.json and provides lookup helpers.
@@ -25,7 +28,7 @@ class EnrichmentProvider:
             with resource.open(encoding="utf-8") as fp:
                 self._data: Dict[str, Any] = json.load(fp)
             uuid_count = len(self._data.get("by_uuid", {}))
-            set_count = len([k for k in self._data.keys() if k != "by_uuid"])
+            set_count = len([k for k in self._data.keys() if k not in ("by_uuid", "_comment")])
             LOGGER.info(
                 f"Loaded enrichment data: {uuid_count} UUID entries, "
                 f"{set_count} set-specific entries"
