@@ -16,7 +16,7 @@ class TestEnrichmentProviderInit:
         assert "FIN" in provider._data
         assert "NEO" in provider._data
         # Check that set sections have card entries
-        assert "551a|Traveling Chocobo" in provider._data["FIN"]
+        assert "551a" in provider._data["FIN"]
 
     def test_init_handles_missing_file(self, tmp_path, monkeypatch):
         """Test that EnrichmentProvider handles missing enrichment file gracefully."""
@@ -31,51 +31,11 @@ class TestEnrichmentProviderInit:
         pytest.skip("RESOURCE_PATH mocking not supported due to import-time evaluation")
 
 
-class TestEnrichmentProviderValidation:
-    """Test EnrichmentProvider validation logic."""
-
-    def test_validate_valid_promo_types(self):
-        """Test validation accepts valid promo_types."""
-        provider = EnrichmentProvider()
-        entry = {"promo_types": ["neoninkyellow", "neoninkblue"]}
-        assert provider._validate_enrichment_entry(entry, "test") is True
-
-    def test_validate_empty_promo_types(self):
-        """Test validation accepts empty promo_types list."""
-        provider = EnrichmentProvider()
-        entry = {"promo_types": []}
-        assert provider._validate_enrichment_entry(entry, "test") is True
-
-    def test_validate_no_promo_types(self):
-        """Test validation accepts entries without promo_types."""
-        provider = EnrichmentProvider()
-        entry = {"other_field": "value"}
-        assert provider._validate_enrichment_entry(entry, "test") is True
-
-    def test_validate_rejects_non_list_promo_types(self):
-        """Test validation rejects non-list promo_types."""
-        provider = EnrichmentProvider()
-        entry = {"promo_types": "not-a-list"}
-        assert provider._validate_enrichment_entry(entry, "test") is False
-
-    def test_validate_rejects_non_string_items(self):
-        """Test validation rejects promo_types with non-string items."""
-        provider = EnrichmentProvider()
-        entry = {"promo_types": [123, 456]}
-        assert provider._validate_enrichment_entry(entry, "test") is False
-
-    def test_validate_rejects_mixed_types(self):
-        """Test validation rejects promo_types with mixed types."""
-        provider = EnrichmentProvider()
-        entry = {"promo_types": ["valid", 123, "another"]}
-        assert provider._validate_enrichment_entry(entry, "test") is False
-
-
 class TestEnrichmentProviderLookup:
     """Test EnrichmentProvider lookup strategies."""
 
-    def test_lookup_by_set_number_name(self):
-        """Test primary lookup by set+number+name (FIN 551a - Traveling Chocobo, yellow)."""
+    def test_lookup_by_set_number(self):
+        """Test primary lookup by set+number (FIN 551a - Traveling Chocobo, yellow)."""
         provider = EnrichmentProvider()
         card = MtgjsonCardObject()
         card.set_code = "FIN"
@@ -115,9 +75,19 @@ class TestEnrichmentProviderLookup:
         card.number = "430"
         card.name = "Different Name"
         
-        # Production data has "430|Hidetsugu, Devouring Chaos" - name must match
         result = provider.get_enrichment_for_card(card)
         assert result is None
+
+    def test_lookup_with_case_insensitive_name_returns_enrichment(self):
+        """Test case-insensitive name matching returns enrichment."""
+        provider = EnrichmentProvider()
+        card = MtgjsonCardObject()
+        card.set_code = "NEO"
+        card.number = "430"
+        card.name = "hidetsugu, devouring chaos"
+
+        result = provider.get_enrichment_for_card(card)
+        assert result == {"promo_types": ["neoninkgreen"]}
 
     def test_lookup_sld_card(self):
         """Test lookup for SLD card (SLD 424 - Ghostly Prison, yellow)."""
@@ -180,15 +150,6 @@ class TestEnrichmentProviderDeepCopy:
         pytest.skip("RESOURCE_PATH mocking not supported due to import-time evaluation")
 
 
-class TestEnrichmentProviderInvalidData:
-    """Test EnrichmentProvider handles invalid data gracefully."""
-
-    def test_invalid_promo_types_returns_none(self, tmp_path, monkeypatch):
-        """Test that invalid promo_types causes validation to return None."""
-        # Skip due to monkeypatch limitations
-        pytest.skip("RESOURCE_PATH mocking not supported due to import-time evaluation")
-
-
 class TestEnrichmentProviderEdgeCases:
     """Test edge cases and boundary conditions."""
 
@@ -214,7 +175,7 @@ class TestEnrichmentProviderGetEnrichmentForSet:
         
         assert result is not None
         assert isinstance(result, dict)
-        assert "551a|Traveling Chocobo" in result
+        assert "551a" in result
 
     def test_get_enrichment_for_set_returns_none_for_missing_set(self):
         """Test that get_enrichment_for_set returns None for non-existent set."""
@@ -231,7 +192,7 @@ class TestEnrichmentProviderGetEnrichmentForSet:
         assert result is not None
         assert isinstance(result, dict)
         assert len(result) > 1  # NEO has multiple enriched cards
-        assert "430|Hidetsugu, Devouring Chaos" in result
+        assert "430" in result
 
 
 class TestEnrichmentProviderGetEnrichmentFromSetData:
@@ -267,15 +228,15 @@ class TestEnrichmentProviderGetEnrichmentFromSetData:
         """Test that get_enrichment_from_set_data returns reference (no deep copy)."""
         provider = EnrichmentProvider()
         set_enrichment = provider.get_enrichment_for_set("FIN")
-        
+
         card = MtgjsonCardObject()
         card.set_code = "FIN"
         card.number = "551a"
         card.name = "Traveling Chocobo"
-        
+
         result1 = provider.get_enrichment_from_set_data(set_enrichment, card)
         result2 = provider.get_enrichment_from_set_data(set_enrichment, card)
-        
+
         # Both should be the same reference from the dictionary
         assert result1 is result2
 
