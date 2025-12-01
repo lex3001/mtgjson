@@ -1,3 +1,7 @@
+"""
+Enrichment Provider for MTGJSON
+"""
+
 import copy
 import json
 import logging
@@ -16,7 +20,7 @@ class EnrichmentProvider:
     """
     Loads mtgjson5/resources/card_enrichment.json and provides lookup helpers.
 
-    Lookup key format: {SET}->{collector_number}|{name}
+    Lookup key format: {SET}->{collector_number}
     """
 
     def __init__(self) -> None:
@@ -26,11 +30,11 @@ class EnrichmentProvider:
                 self._data: Dict[str, Any] = json.load(fp)
             set_count = len(self._data)
             card_count = sum(len(entries) for entries in self._data.values())
-            LOGGER.info(f"Loaded enrichment data: {card_count} cards across {set_count} sets")
-        except FileNotFoundError:
-            LOGGER.warning(
-                "card_enrichment.json not found, card enrichment disabled"
+            LOGGER.info(
+                f"Loaded enrichment data: {card_count} cards across {set_count} sets"
             )
+        except FileNotFoundError:
+            LOGGER.warning("card_enrichment.json not found, card enrichment disabled")
             self._data = {}
         except json.JSONDecodeError as e:
             LOGGER.error(f"Malformed card_enrichment.json: {e}")
@@ -39,41 +43,21 @@ class EnrichmentProvider:
             LOGGER.error(f"Error reading card_enrichment.json: {e}")
             self._data = {}
 
-    def _validate_enrichment_entry(
-        self, entry: Dict[str, Any], context: str
-    ) -> bool:
-        """
-        Validate enrichment entry has correct structure.
-        :param entry: Enrichment data dictionary
-        :param context: Context string for logging (e.g., "SET:number|name", e.g., "NEO:430|Hidetsugu, Devouring Chaos")
-        :return: True if valid, False otherwise
-        """
-        if "promo_types" in entry:
-            if not isinstance(entry["promo_types"], list):
-                LOGGER.warning(
-                    f"Invalid promo_types in {context}: expected list, got {type(entry['promo_types']).__name__}"
-                )
-                return False
-            if not all(isinstance(pt, str) for pt in entry["promo_types"]):
-                LOGGER.warning(
-                    f"Invalid promo_types in {context}: expected list of strings"
-                )
-                return False
-        return True
-
     def _make_card_key(self, card: MtgjsonCardObject) -> str:
         """
         Construct the lookup key for a card.
         :param card: MTGJSON card object
-        :return: Lookup key in format "{number}|{name}"
+        :return: Lookup key in format "{number}"
         """
-        return f"{card.number}|{card.name}"
+        return card.number
 
-    def get_enrichment_for_set(self, set_code: str) -> Optional[Dict[str, Dict[str, Any]]]:
+    def get_enrichment_for_set(
+        self, set_code: str
+    ) -> Optional[Dict[str, Dict[str, Any]]]:
         """
         Get all enrichment data for a given set code.
         :param set_code: Set code to look up
-        :return: Dictionary of enrichment data keyed by "{number}|{name}", or None if not found
+        :return: Dictionary of enrichment data keyed by "{number}", or None if not found
         """
         return self._data.get(set_code)
 
@@ -87,7 +71,19 @@ class EnrichmentProvider:
         :return: Enrichment data dictionary or None if not found
         """
         key = self._make_card_key(card)
-        return set_enrichment.get(key)
+        entry = set_enrichment.get(key)
+        if not entry:
+            return None
+
+        expected_name = entry.get("name", "")
+        if card.name.lower() == expected_name.lower():
+            return entry.get("enrichment")
+
+        LOGGER.warning(
+            f"Enrichment name mismatch for {card.set_code}:{card.number}: "
+            f"Card name '{card.name}' does not match expected name '{expected_name}'"
+        )
+        return None
 
     def get_enrichment_for_card(
         self, card: MtgjsonCardObject
@@ -103,9 +99,6 @@ class EnrichmentProvider:
 
         enrichment = self.get_enrichment_from_set_data(set_block, card)
         if enrichment:
-            key = self._make_card_key(card)
-            context = f"{card.set_code}:{key}"
-            if self._validate_enrichment_entry(enrichment, context):
-                return copy.deepcopy(enrichment)
+            return copy.deepcopy(enrichment)
 
         return None
