@@ -72,8 +72,17 @@ class EnrichmentProvider:
         """
         key = self._make_card_key(card)
         entry = set_enrichment.get(key)
-        if entry and card.name.lower() == entry.get("expected_name", "").lower():
+        if not entry:
+            return None
+
+        expected_name = entry.get("expected_name", "")
+        if card.name.lower() == expected_name.lower():
             return entry.get("enrichment")
+
+        LOGGER.error(
+            f"Enrichment name mismatch for {card.set_code}:{card.number}: "
+            f"Card name '{card.name}' does not match expected name '{expected_name}'"
+        )
         return None
 
     def get_enrichment_for_card(

@@ -67,8 +67,8 @@ class TestEnrichmentProviderLookup:
         result = provider.get_enrichment_for_card(card)
         assert result == {"promo_types": ["neoninkgreen"]}
 
-    def test_lookup_with_wrong_name_returns_none(self):
-        """Test wrong name with correct set+number returns None (NEO 430 exists but name doesn't match)."""
+    def test_lookup_with_wrong_name_returns_none_and_logs_error(self, caplog):
+        """Test wrong name with correct set+number returns None and logs an error."""
         provider = EnrichmentProvider()
         card = MtgjsonCardObject()
         card.set_code = "NEO"
@@ -76,7 +76,10 @@ class TestEnrichmentProviderLookup:
         card.name = "Different Name"
         
         result = provider.get_enrichment_for_card(card)
+
         assert result is None
+        assert "Enrichment name mismatch for NEO:430" in caplog.text
+        assert "Card name 'Different Name' does not match expected name 'Hidetsugu, Devouring Chaos'" in caplog.text
 
     def test_lookup_with_case_insensitive_name_returns_enrichment(self):
         """Test case-insensitive name matching returns enrichment."""
